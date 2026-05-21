@@ -69,18 +69,65 @@ Backed by **NotebookLM** for persistent course storage and cross-conversation me
 
 ## Installation
 
-This is a Claude skill, not a standalone tool. To use it:
+This is a Claude skill, not a standalone tool — it has to live inside a Claude product to do anything.
 
-1. **Install the NotebookLM MCP extension** (required for cross-conversation memory):
-   ```
-   pip install notebooklm-mcp-cli
-   nlm login
-   ```
-   Then download the `.mcpb` extension from [jacob-bd/notebooklm-mcp-cli/releases](https://github.com/jacob-bd/notebooklm-mcp-cli/releases) and install it via **Claude Desktop → Settings → Extensions**.
+### 1. Download the skill
 
-2. **Add this skill** by copying `SKILL.md` and the `references/` folder into your Claude skills directory.
+Pick whichever option matches how you use Claude.
 
-3. **Trigger it** by asking Claude to take or review course notes — e.g. *"Write notes for Chapter 3 of my Dynamics class"* or *"Review my notes for ECOR 1042"*.
+**Option A — Clone with git (Claude Code / Claude Desktop):**
+
+```bash
+# macOS / Linux
+git clone https://github.com/taliamekh/course-notes-skill.git ~/.claude/skills/course-notes
+
+# Windows (PowerShell)
+git clone https://github.com/taliamekh/course-notes-skill.git "$env:USERPROFILE\.claude\skills\course-notes"
+```
+
+**Option B — Download as ZIP:**
+
+[Download main.zip](https://github.com/taliamekh/course-notes-skill/archive/refs/heads/main.zip), then extract it and rename the resulting folder from `course-notes-skill-main` to `course-notes`. Move it into your Claude skills directory:
+
+| Platform | Path |
+|---|---|
+| macOS / Linux | `~/.claude/skills/course-notes/` |
+| Windows | `C:\Users\<your-name>\.claude\skills\course-notes\` |
+
+**Option C — Upload to claude.ai (web):**
+
+Download the ZIP above, then in claude.ai open **Settings → Capabilities → Skills** and upload the unzipped folder (or re-zip the inner contents and upload that).
+
+After install, the directory should look like:
+
+```
+~/.claude/skills/course-notes/
+├── SKILL.md
+└── references/
+    ├── theme.md
+    └── theme-previews.html
+```
+
+Restart Claude (or open a new chat) so it picks up the new skill.
+
+### 2. Install NotebookLM MCP (required for cross-conversation memory)
+
+The skill stores its course config and concepts index inside a NotebookLM notebook, so a fresh chat can pick up where the last one left off. Without this, every new chat will re-explain things you've already covered.
+
+```bash
+pip install notebooklm-mcp-cli
+nlm login
+```
+
+Then grab the `.mcpb` extension from [jacob-bd/notebooklm-mcp-cli/releases](https://github.com/jacob-bd/notebooklm-mcp-cli/releases) and install it via **Claude Desktop → Settings → Extensions → Install Extension**. Restart Claude Desktop.
+
+### 3. Use it
+
+Just ask. The skill triggers whenever you mention course notes, lecture notes, an assignment, exam prep, or a specific class — e.g.:
+
+- *"Write notes for Chapter 3 of my Dynamics class"*
+- *"Help me prep for my MECH 2005 midterm"*
+- *"Review my notes for ECOR 1042"*
 
 ## Repository contents
 
