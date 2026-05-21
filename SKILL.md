@@ -1,25 +1,78 @@
 ---
 name: course-notes
 description: >
-  Interactive course notes with the Deep Space dark theme. Supports engineering, math, stats, CS, business, physics,
+  Interactive course notes with 30 selectable themes. Supports engineering, math, stats, CS, business, physics,
   and any university course. Trigger on: class notes, lecture notes, chapter notes, equation sheets, formula sheets,
   theorem references, algorithm references, assignment solutions (PA, homework, labs), test/midterm/final exam prep,
   course progress tracking, study notes, practice problems, chapter examples, worked examples, proofs, derivations,
   code walkthroughs, case studies, quiz prep, diagrams, or uploading images of notes, textbook pages, lecture slides,
   or handwritten work. Also trigger when updating or viewing previously created notes.
-  Pairs with NotebookLM MCP for cloud storage and AI-powered querying. Always use this skill for academic note-taking
-  even if the user doesn't name a specific subject — if they mention a course, class, or studying, this skill applies.
+  Uses NotebookLM MCP for cross-chapter referencing, source querying, and running index storage.
+  Always use this skill for academic note-taking even if the user doesn't name a specific subject —
+  if they mention a course, class, or studying, this skill applies.
 ---
 
 # Course Notes System
 
-A structured note-taking system that creates interactive, color-coded HTML note pages for university courses, backed by NotebookLM for persistent storage. Every solution, concept, and reference item is explained from scratch for someone learning the material for the first time.
+A structured note-taking system that creates interactive, color-coded HTML note pages for university courses. Every solution, concept, and reference item is explained from scratch for someone learning the material for the first time.
+
+## Setup & Prerequisites
+
+### Required: NotebookLM MCP Extension
+This skill relies on the **NotebookLM MCP Server** extension for Claude Desktop. It must be installed before using this skill.
+
+**How to install (one-time):**
+1. Install the Python package: `pip install notebooklm-mcp-cli`
+2. Authenticate: `nlm login` (opens browser, sign into Google)
+3. Download the `.mcpb` extension file from https://github.com/jacob-bd/notebooklm-mcp-cli/releases
+4. In Claude Desktop: **Settings → Extensions → Install Extension** → select the `.mcpb` file
+5. Restart Claude Desktop
+
+### How It Works
+- **NotebookLM** holds all course source material (PDFs, slides, lecture notes) and acts as a persistent knowledge base across conversations
+- **Uploaded files** (sent directly to Claude) are read from disk page-by-page for detailed content extraction and image embedding
+- **NotebookLM queries** handle cross-chapter referencing ("was this concept already covered?") without needing all chapters in context
+- **A running index** (stored as a note in NotebookLM) tracks every concept, formula, and definition by chapter so notes stay coherent and never redundantly re-explain material
+- **HTML output** goes to `/mnt/user-data/outputs/` for the user to push to their website/repo
+
+### Workflow Summary
+1. User uploads course materials to a NotebookLM notebook (via notebooklm.google.com or `source_add`)
+2. User sends chapter-by-chapter material to Claude (uploaded files or pasted text)
+3. Claude reads uploaded files from disk for full detail, queries NotebookLM for cross-referencing
+4. Claude generates styled HTML notes and updates the running index
+5. User downloads HTML and pushes to their website repo
+
+### How Claude Remembers Across Conversations
+Claude has no memory between conversations. The `_CONCEPTS_INDEX` note in NotebookLM is what bridges that gap. Here is what happens every time:
+
+**Start of every note-writing session (even in a new conversation):**
+1. Claude retrieves the `_CONCEPTS_INDEX` note from NotebookLM via `note` (action: list) → read content
+2. This tells Claude exactly what every previous chapter covered: concepts defined, formulas introduced, key examples, and which chapters reference each other
+3. Claude uses this to decide what to skip, what to back-reference, and what's new
+
+**End of every note-writing session:**
+1. Claude updates `_CONCEPTS_INDEX` via `note` (action: update) with the new chapter's concepts, formulas, cross-references, and key examples
+2. This ensures the NEXT conversation (even days later) picks up exactly where this one left off
+
+**If the user asks Claude to write Chapter 5, Claude will:**
+1. Pull `_CONCEPTS_INDEX` → see Ch1–Ch4 summaries
+2. Pull `_COURSE_CONFIG` → know the course structure and assessments
+3. Query NotebookLM with `notebook_query` if anything is unclear ("did Chapter 3 cover beam deflection or just shear/moment diagrams?")
+4. Read the uploaded Chapter 5 material from disk page-by-page for full detail
+5. Write Chapter 5 notes, referencing earlier chapters instead of re-explaining
+6. Update `_CONCEPTS_INDEX` with Chapter 5's additions
+
+**The index is compact by design** — a full semester fits in a few hundred lines, well within context limits. It's not the full notes, just a map of what lives where.
 
 ## Theme
 
-**Deep Space** — dark background (#0B0E14), purple (#AD8CFF), teal (#56D6C1), gold (#FFD866). Font: Space Grotesk.
+The default theme is **Deep Space** — the original theme this skill was built with. Its full reference (color tokens, component templates, SVG palette) lives in `references/theme.md`. If the user picks a different theme in Question 4, substitute that theme's colors and font into the same component templates. If they skip Question 4 or say "default", use Deep Space.
 
-Read `references/theme.md` before generating any HTML output for color tokens, component templates, and the full color-coding system.
+**User default preference:** If a user says "make X my default theme", store it in NotebookLM as a note titled `_USER_THEME_DEFAULT` with the theme name, colors, and font. Future courses will use that theme unless overridden in Question 4. If no `_USER_THEME_DEFAULT` note exists, Deep Space is the default.
+
+**Theme preview:** If the user asks to preview a theme before committing, generate a small static HTML file showing: background color, 4 accent color swatches with labels, a font sample (heading + body text), and a mock menu bar with 3-4 placeholder items. This is NOT interactive — just a visual preview saved to `/mnt/user-data/outputs/theme-preview.html`.
+
+**Notebook-style themes (7, 8, 9):** These use CSS background patterns (repeating lines, grid dots, or cork texture) in addition to colors. The grid/lines are subtle and should not interfere with readability.
 
 ---
 
@@ -61,14 +114,19 @@ Ask the user (use the ask_user_input tool where possible, free text for specific
 **Question 1: "What's the course name and code?"**
 Free text — e.g., "MECH 2005 — Dynamics"
 
-**Question 2: "List everything you're graded on and how many of each."**
-Free text — the user types something like:
-- "8 assignments, 3 tests, 1 final (cumulative)"
-- "6 PAs, 1 midterm, 1 final, 4 labs"
-- "10 homework sets, 2 midterms, 1 final, weekly quizzes"
-- "5 assignments, a project, and a final"
+**Question 2: "What's your course structure? List all assessments — tests, midterms, finals, assignments, labs, quizzes, projects — and how many of each."**
+Free text — prompt with examples so the user knows what to include:
+- "How many tests/midterms? Is the final cumulative?"
+- "How many assignments or PAs? Any labs or projects?"
+- "Any quizzes? Weekly, bi-weekly?"
+- "Do you know the grade weights?"
 
-Parse whatever they give you. Extract: assessment type, count, and any notes (cumulative, weighted, etc.). If something is ambiguous ("tests" vs "midterms"), don't ask — just use their terminology. If they mention weights ("assignments 20%, midterm 30%, final 50%"), store those too.
+Example answers:
+- "3 tests, 8 assignments, 1 final (cumulative), no labs"
+- "1 midterm, 1 final, 6 PAs, 4 labs, weekly quizzes"
+- "2 midterms (30% each), 1 final (40%), 5 homework sets"
+
+Parse whatever they give you. Extract: assessment type, count, and any notes (cumulative, weighted, etc.). If something is ambiguous ("tests" vs "midterms"), don't ask — just use their terminology.
 
 **Question 3: "How is the course content organized?"**
 Single-select:
@@ -77,12 +135,98 @@ Single-select:
 - By modules/units
 - Mix of the above
 
-**Store this configuration.** Save it as a note in the NotebookLM notebook titled `_COURSE_CONFIG` with a structured format:
+**Question 4: "Pick a theme for your notes (default: Deep Space)."**
+Check NotebookLM for a `_USER_THEME_DEFAULT` note first — if one exists, use that as the default instead of Deep Space and tell the user: "Your default theme is {X}. Want to keep it or pick a different one?"
+
+If no user default exists, present the 30 themes below by name and one-line description. The user can:
+- Pick a theme by name or number
+- Say "default" or skip to use Deep Space
+- Ask to preview any theme before committing (generates a non-interactive mini preview)
+- Say "make this my default" to save their choice as the default for all future courses
+
+After picking a theme, ask: **"Happy with the font, or want to swap it?"** and offer the font list below.
+
+### 30 Available Themes
+
+Each theme defines 6 color-coded roles used throughout the notes:
+- **Equations** (primary) — equation cards, formula highlights
+- **Definitions** (secondary) — definition blocks, concept explanations
+- **Tips** (tertiary) — tip callouts, exam warnings, key insights
+- **Derivations** — step-by-step derivation chains, proofs
+- **Examples** — worked examples, PA solutions
+- **Units** — unit analysis blocks, conditions
+
+**Equation coloring rule:**
+- In **chapter notes and solutions**: equations/formulas are displayed in the **equation accent color**. Variables are NOT individually color-coded — they use neutral variable pills (name + unit) below the formula.
+- In the **formula/equation reference sheet only**: variables within formulas ARE color-coded with their own distinct palette. This palette is **theme-specific** — each theme can define as many variable colors as needed, as long as they stay visually on-theme and are consistent every time that theme is used.
+
+**Theme independence — CRITICAL:**
+Each theme defines its OWN complete color set. Do NOT fall back to Deep Space colors for any theme. Every theme specifies:
+- Title/heading color (used for page titles, chapter headings)
+- 6 content-type colors (equations, definitions, tips, derivations, examples, units)
+- Menu text colors (active + inactive)
+- Background, surface, border, text, muted text
+- Equation name color (lighter shade of equation color)
+- Variable pill colors for the equation/formula sheet (as many as needed, all on-theme)
+
+When generating notes for a non-Deep Space theme, pull ALL colors from that theme's definition — never mix in Deep Space defaults. The `references/theme.md` file contains component TEMPLATES (equation cards, callouts, step blocks, etc.) that work with any theme by substituting the chosen theme's colors. The templates are structural, not color-specific.
+
+**Showing previews:** When the user asks to see themes, copy `references/theme-previews.html` to `/mnt/user-data/outputs/` and present it. Do NOT regenerate the preview — it's a static reference file that ships with the skill. If the user asks to preview a SINGLE theme in detail, then generate a focused one-theme preview on the fly.
+
+**Menu readability:** Every theme must define a `menuTxt` color (inactive sidebar items) and `menuActive` color (active item) that have sufficient contrast against the sidebar background. For dark themes, inactive text should be at least `#6A6A6A` brightness. For light themes, inactive text should be no lighter than `#7A7A7A`. Test this visually — if you can't read the menu, the color needs to be darker (light themes) or brighter (dark themes).
+
+| # | Theme Name | Description | Background | Accents | Font |
+|---|---|---|---|---|---|
+| 1 | **Deep Space** | Dark purple cosmos with teal and gold pops | #0B0E14 | #AD8CFF, #56D6C1, #FFD866 | Space Grotesk | Title: #7B5EC7 (deep purple) |
+| 2 | **Pastel Dream** | Soft muted pastels on a warm white base | #FFF8F0 | #C47090, #60A88A, #C4983E, #7088BE | DM Sans |
+| 3 | **Pink Cloud** | Blush pink with warm rose, orchid, and coral | #FFF0F5 | #C45080, #8A70B0, #C48870, #A06098 | Nunito |
+| 4 | **Hacker Terminal** | Green-on-black retro terminal aesthetic | #0A0A0A | #00FF41, #00CCDD, #FFFF00, #4488FF | Fira Code |
+| 3 | **VS Code Dark** | Accurate Dark+ with official syntax colors | #1E1E1E | #569CD6, #4EC9B0, #DCDCAA, #CE9178, #6A9955, #C586C0 | JetBrains Mono | Sidebar: #252526, Title: #9CDCFE |
+| 6 | **Earth & Stone** | Warm terracotta, moss green, and sandstone | #2C2416 | #C4835A, #8B9F6B, #D4B98C, #A67C52 | Bitter |
+| 7 | **Notebook Classic** | Lined paper background with blue ink and red margin | #FDF6E3 | #2B5EA7, #D94040, #4A4A4A, #8B8B8B | Caveat |
+| 8 | **Grid Paper** | Engineering grid paper with pencil-grey tones | #F5F5F0 | #4A90D9, #E85D5D, #5CAB7D, #888888 | Architects Daughter |
+| 9 | **Botanical Garden** | Sage greens, soft pinks, and cream — illustrated botanical feel | #F8F5EE | #5B8C3E, #C46B8A, #D4960A, #4A7A9B | Cormorant Garamond |
+| 10 | **Ocean Depths** | Deep sea blues with bioluminescent accents | #0A1628 | #00D4FF, #0088CC, #FF6B6B, #64FFDA | Inter |
+| 11 | **Sunset Gradient** | Warm oranges and pinks fading into purple | #1A0A2E | #FF6B35, #FF9A8B, #C084FC, #FFD93D | Poppins |
+| 12 | **Forest Canopy** | Deep woodland greens with autumn gold | #0D1F0D | #4CAF50, #8BC34A, #FFB74D, #A1887F | Merriweather |
+| 13 | **Arctic Frost** | Ice whites and pale blues, crisp and clean | #F0F4F8 | #0277BD, #00838F, #1565C0, #3F51B5, #546E7A, #5E35B1 | Roboto |
+| 14 | **Lavender Fields** | Soft purples and lilacs on a light mauve base | #F3E8FF | #7830C0, #6070C8, #B07040, #9850B8 | Fredoka |
+| 15 | **Midnight Navy** | Classic navy with gold and cream accents | #0D1B2A | #FFD700, #E0E0CE, #1B4965, #5FA8D3 | Playfair Display |
+| 16 | **Engineering Blueprint** | Blueprint blue-on-white with technical drafting feel | #F8FBFF | #1565C0, #0D47A1, #FF6F00, #E3F2FD | IBM Plex Mono |
+| 17 | **Med School** | Clinical white with anatomy-illustration accents | #FAFAFA | #E53935, #1E88E5, #43A047, #F4511E | Source Sans 3 |
+| 18 | **Business Formal** | Charcoal and navy with gold accents, boardroom ready | #1A1A2E | #E0C97F, #4A6FA5, #C8C8C8, #2D3A4A | Libre Franklin |
+| 19 | **CS Terminal** | Dark IDE with syntax rainbow highlights | #282C34 | #61AFEF, #98C379, #E06C75, #D19A66 | Source Code Pro |
+| 20 | **Law Review** | Cream parchment with burgundy and navy, classic serif | #FFFDF5 | #800020, #1B365D, #8B7355, #C8A96E | Crimson Text |
+| 21 | **Chemistry Lab** | Periodic-table inspired with element-colored accents | #0F0F1A | #00BCD4, #FF9800, #8BC34A, #E91E63 | Rubik |
+| 22 | **Architecture Studio** | Minimalist concrete with precise accent lines | #F5F5F5 | #333333, #FF4444, #0066CC, #E0E0E0 | Barlow |
+| 23 | **Math Chalkboard** | Dark green chalkboard with chalk-white text | #2D4A3E | #FFFFFF, #FFE082, #EF9A9A, #A5D6A7 | Kalam |
+| 24 | **Art Studio** | Creative splashes of color on a gallery-white canvas | #FFFFFF | #FF1744, #2979FF, #FFD600, #00E676 | Fredoka |
+| 25 | **Neon Cyberpunk** | Electric neons on pitch black | #0A0A0A | #FF00FF, #00FFFF, #FF3366, #39FF14 | Orbitron |
+| 26 | **Vintage Library** | Aged paper with warm leather-brown tones | #F5E6CA | #8B4513, #654321, #DAA520, #CD853F | Lora |
+| 27 | **Mint Fresh** | Cool mint green with clean white and grey | #F0FFF4 | #38B2AC, #2D9CDB, #48BB78, #E2E8F0 | Outfit |
+| 28 | **Cherry Blossom** | Japanese-inspired pink and white with soft grey | #FFF5F7 | #DB2777, #F472B6, #FDA4AF, #9CA3AF | Zen Maru Gothic |
+| 29 | **Coffee Shop** | Warm espresso browns and creamy latte tones | #1C1410 | #C49A6C, #8B6B4A, #E8D5B7, #5C3D2E | Josefin Sans |
+| 30 | **Northern Lights** | Aurora borealis — shimmering green, violet, and blue on arctic night sky with subtle glow effects | #070B18 | #00E676, #B388FF, #448AFF, #FF4081, #FFD54F, #18FFFF | Exo 2 |
+
+### Font Swap Options
+If the user doesn't like their theme's default font, offer these alternatives:
+- **Sans-serif:** Inter, Outfit, DM Sans, Nunito, Poppins, Roboto, Barlow, Libre Franklin, Source Sans 3, Quicksand, Fredoka, Exo 2, Rubik, Sora
+- **Serif:** Merriweather, Playfair Display, Lora, Crimson Text, Bitter
+- **Monospace:** JetBrains Mono, Fira Code, Source Code Pro, IBM Plex Mono, Space Mono
+- **Handwritten:** Caveat, Patrick Hand, Kalam, Architects Daughter
+
+The chosen theme and font are stored in `_COURSE_CONFIG` and applied to ALL HTML output for that course. Read `references/theme.md` for component templates — substitute the chosen theme's colors and font in place of the Deep Space defaults.
+
+**Store this configuration.** Save it as a note in the NotebookLM notebook using the `note` tool (action: create) with title `_COURSE_CONFIG`:
 
 ```
 Course: MECH 2005 — Dynamics
 Subject: Engineering
 Content org: Chapters
+Theme: Deep Space
+  Background: #0B0E14
+  Accents: #AD8CFF, #56D6C1, #FFD866
+  Font: Space Grotesk
 Assessments:
   - Assignments: 8 (PA1–PA8)
   - Tests: 3 (Test 1, Test 2, Test 3)
@@ -91,6 +235,8 @@ Assessments:
   - Quizzes: 0
 Chapters: [populated as content is added]
 ```
+
+Also create a `_CONCEPTS_INDEX` note (see Section 3 below) — this is the running index that tracks what each chapter covers to prevent redundant explanations across chapters.
 
 **This configuration drives everything:**
 - The menu bar shows only relevant sections (no "Midterm prep" if the course has tests instead)
@@ -136,21 +282,69 @@ For uploaded images: copy from `/mnt/user-data/uploads/`, view each to understan
 Base64-encode each image, embed as `<img src="data:image/png;base64,...">` inside a `.figure-box` container with caption.
 
 **Step 5: Generate diagrams when none exist.**
-If a problem has a visual setup but no image provided, generate an SVG in the Deep Space palette. Also generate when: uploaded image is blurry, solution says "see diagram" with none provided, or CS/stats/business problems need flowcharts/trees/curves.
+If a problem has a visual setup but no image provided, generate an SVG using the chosen theme's palette. Also generate when: uploaded image is blurry, solution says "see diagram" with none provided, or CS/stats/business problems need flowcharts/trees/curves.
 
-### 3. NotebookLM storage
+### 3. NotebookLM Integration — Cross-Referencing & Running Index
+
+NotebookLM serves two purposes: (1) querying source material across chapters without loading everything into context, and (2) storing a running index that tracks what concepts have been covered and where.
 
 **First time for a course:**
-1. `notebook_list` to check for existing notebook
-2. `notebook_create` with course name if needed
-3. Store course config as `_COURSE_CONFIG` note
+1. `notebook_create` with the course name as title
+2. User uploads their course PDFs/slides to the notebook (via notebooklm.google.com or `source_add` with source_type: url/drive/file)
+3. Create course config note: `note` (action: create, title: `_COURSE_CONFIG`, content: config from step 0)
+4. Create concepts index note: `note` (action: create, title: `_CONCEPTS_INDEX`, content: empty template below)
 
-**Adding content:**
-- `note` (create) for each chapter/section
-- Title formats: `Ch{N} — {Title}`, `Lecture {N} — {Title}`, `Ch{N} Examples — {Title}`, `PA{N} / HW{N} / Lab{N} — {Title}`, `Test {N} Prep — {Topic}`, `Final Prep — {Topic}`
-- `label` to organize into categories
+**Running Concepts Index (`_CONCEPTS_INDEX`) — CRITICAL FOR COHERENCE**
 
-**Retrieving:** `notebook_get`, `note` (list), `notebook_query`
+This note is updated after EVERY chapter is written. It prevents redundant explanations and enables cross-referencing. Format:
+
+```
+CONCEPTS INDEX — MECH 2005 Dynamics
+Last updated: Ch3
+
+Ch1 — Kinematics of Particles:
+  Defined: position, velocity, acceleration, rectilinear motion, projectile motion
+  Formulas: v=ds/dt, a=dv/dt, s=s₀+v₀t+½at², projectile equations
+  Key examples: 1.1 (rectilinear), 1.2 (projectile), 1.3 (curvilinear)
+
+Ch2 — Force and Acceleration:
+  Defined: Newton's laws, FBDs, normal/tangential components
+  Formulas: F=ma, ΣF=ma component equations
+  Refs Ch1: uses velocity/acceleration definitions from Ch1 (not re-explained)
+  Key examples: 2.1 (incline), 2.2 (pulley system)
+
+Ch3 — Work and Energy:
+  Defined: work, kinetic energy, potential energy, conservation of energy
+  Formulas: W=Fd·cosθ, KE=½mv², PE=mgh, work-energy theorem
+  Refs Ch2: uses FBD approach from Ch2 for identifying forces (not re-explained)
+  Key examples: 3.1 (spring system), 3.2 (roller coaster)
+```
+
+**Before writing a new chapter:**
+1. Retrieve the `_CONCEPTS_INDEX` note: `note` (action: list) to find it, then read its content
+2. Query NotebookLM if needed: `notebook_query` with questions like "What topics are covered in the Chapter 4 lecture slides?" or "Was thermal expansion already explained in earlier chapters?"
+3. Use `source_get_content` to pull raw text from specific sources if you need full detail beyond what the uploaded files provide
+
+**After writing a new chapter:**
+1. Update `_CONCEPTS_INDEX` via `note` (action: update) with new chapter's concepts, formulas, cross-references
+2. Optionally store the finished HTML summary as a text source via `source_add` (source_type: text) for future querying
+
+**Cross-referencing rules:**
+- If a concept was defined in a previous chapter, DON'T re-explain it — write "see Section X.Y" or "recall from Ch2 that F=ma"
+- If a formula from a previous chapter is USED but not the focus, show it briefly with a back-reference
+- If a concept is being EXTENDED (e.g., Ch1 defined velocity, Ch3 uses it in energy equations), give a one-line reminder and then extend
+
+**Available NotebookLM MCP tools reference:**
+- `notebook_create` — create a new notebook
+- `notebook_get` — get notebook details and list of sources
+- `notebook_query` — ask AI questions about sources in the notebook (for cross-referencing)
+- `notebook_describe` — get AI summary of entire notebook
+- `note` (action: create/list/update/delete) — manage notes (used for config + running index)
+- `source_add` (source_type: url/text/drive/file) — add sources to notebook
+- `source_get_content` — get raw text of a source (fast, no AI processing)
+- `source_describe` — get AI summary of a single source
+- `label` — organize sources into categories
+- `studio_create` — generate study artifacts (flashcards, quizzes, audio overviews, etc.)
 
 ### 4. Generate the interactive HTML note page
 
@@ -348,7 +542,7 @@ The tracker is NOT just a flat list. It's organized chronologically as the cours
 
 This mirrors how students actually experience a course: learn chapters → prep for test → take test → learn more → prep for next test → final.
 
-**Checkpoint styling (Deep Space):**
+**Checkpoint styling (uses chosen theme):**
 - Checkpoint divider: full-width bar with `background: linear-gradient(90deg, #AD8CFF33, #56D6C133)`
 - Flag icon (⚑): gold (#FFD866) for upcoming assessments, teal (#56D6C1) for completed ones
 - Assessment name: bold, large text in accent purple
@@ -368,7 +562,7 @@ This mirrors how students actually experience a course: learn chapters → prep 
 10. Example exams appear as sub-items under their prep section, with individual questions as checkable items
 11. Assignments are grouped by which checkpoint they fall under (based on chapter coverage)
 
-**Styling (Deep Space):**
+**Styling (uses chosen theme):**
 - Checked: accent purple (#AD8CFF) checkbox fill
 - Unchecked: surface (#141820) with border (#1E2433)
 - Progress bar fill: gradient from purple to teal
@@ -380,12 +574,12 @@ This mirrors how students actually experience a course: learn chapters → prep 
 
 ## Diagram Generation
 
-When no image provided, generate SVG with Deep Space palette:
-- Outlines: #AD8CFF / #56D6C1
-- Force arrows: color by type (gravity=#FF6B6B, normal=#56D6C1, friction=#FFD866, applied=#AD8CFF)
-- Labels: #D4D4E8, Space Grotesk
-- Dimensions: #6E7191 dashed
-- Axes: #5B9DFF
+When no image provided, generate SVG using the chosen theme's palette:
+- Outlines: primary and secondary accent colors
+- Force arrows: color by type (use accent colors mapped to categories — e.g., gravity=warm accent, normal=cool accent, friction=gold/tertiary, applied=primary)
+- Labels: light text color from theme, chosen font
+- Dimensions: muted color, dashed
+- Axes: blue accent or secondary
 - Background: transparent
 
 Subject types: Engineering → FBDs, mechanisms. Math → plots, constructions. Stats → curves, trees. CS → flowcharts, data structures. Business → supply/demand, process flows.
@@ -394,25 +588,30 @@ Subject types: Engineering → FBDs, mechanisms. Math → plots, constructions. 
 
 ## HTML Generation Rules
 
-1. Always load: KaTeX (cdnjs), Space Grotesk (Google Fonts), Tabler Icons
+1. Always load: KaTeX (cdnjs), chosen theme font (Google Fonts), Tabler Icons
 2. For CS: also load Prism.js for syntax highlighting
-3. Deep Space palette exclusively (see `references/theme.md`)
+3. Chosen theme palette exclusively (see `references/theme.md` for component templates, substitute chosen theme colors)
 4. KaTeX: `\( inline \)` and `\[ display \]`
 5. Interactive pills (click to expand), collapsible solutions/examples
 6. Fixed menu bar (top), fixed sidebar (full-course view)
 7. Embedded images in `.figure-box` containers with captions
-8. SVG diagrams inline using Deep Space colors
+8. SVG diagrams inline using theme colors
 9. Sections as `<section id="{name}">` for anchor nav
 10. Progress checkboxes persist via localStorage keyed by course name
 11. Menu bar is DYNAMIC — only shows sections relevant to course config
+12. For notebook-style themes (7, 8, 9): add CSS background patterns (lines, grid, cork texture)
 
 ## Image CSS
 
+Use CSS variables derived from the chosen theme. Example for Deep Space (substitute with actual theme colors):
+
 ```css
-.figure-box { background:#141820; border:1px solid #1E2433; border-radius:10px; padding:12px; margin:16px 0; text-align:center; }
+.figure-box { background: var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px; margin:16px 0; text-align:center; }
 .figure-box img { max-width:100%; border-radius:6px; }
-.figure-caption { font-size:12px; color:#6E7191; margin-top:8px; font-style:italic; }
+.figure-caption { font-size:12px; color: var(--muted); margin-top:8px; font-style:italic; }
 ```
+
+Every theme should define these CSS variables at minimum: `--bg`, `--surface`, `--border`, `--text`, `--muted`, `--accent1`, `--accent2`, `--accent3`, `--accent4`.
 
 ---
 
@@ -432,4 +631,7 @@ Before presenting HTML output, verify:
 - [ ] Progress tracker includes all added content with correct hierarchy
 - [ ] Assessment prep sections match course structure (tests/midterms/quizzes/final)
 - [ ] KaTeX renders correctly, code blocks highlighted (CS)
-- [ ] Space Grotesk + Deep Space palette applied
+- [ ] Chosen theme palette and font applied consistently (not hardcoded Deep Space unless that's the chosen theme)
+- [ ] No concept is re-explained if it was already defined in a previous chapter (check _CONCEPTS_INDEX)
+- [ ] Cross-references to earlier chapters use "see Section X.Y" or brief reminders, not full re-explanations
+- [ ] _CONCEPTS_INDEX note updated in NotebookLM after chapter is complete
