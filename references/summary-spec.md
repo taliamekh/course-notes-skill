@@ -10,44 +10,148 @@ The summary page is INCREMENTALLY UPDATED — it grows with each chapter. It is 
 
 **Stat cards** at the top: reference items count, chapters completed, examples count, assignments count — updated every time content is added.
 
-## Per-Chapter Summaries — Concept-Map + What/Why/How Format
+## Section Order (top to bottom)
 
-Each chapter is added as it's completed; pending chapters shown as muted placeholders.
+1. Stat cards
+2. **Decision trees** — interactive flowcharts for "which tool / which theorem / which method"
+3. **Per-chapter cards** — three-part structure (Key Ideas / When to Use What / Traps)
+4. **Quick Reference Table** — sortable by problem type across all chapters
 
-Structure for each chapter summary:
+The summary is built for **practice-problem lookup**, not for re-reading the course. The decision trees come first because that's how a student under time pressure actually uses the summary: "I see this problem — which tool applies?"
 
-1. **One-line chapter overview** — a single sentence capturing the chapter's purpose in the course arc.
+## Decision Trees — Always At Top
 
-2. **Topic clusters** — group related concepts into named clusters (e.g. "Vector Products" containing dot product, cross product, triple product). Each cluster gets:
-   - **What:** one sentence defining the concept or operation.
-   - **Why:** one sentence on why it matters — geometric meaning, physical interpretation, or what it unlocks.
-   - **How:** the key formula or computation step, kept to one line. Use inline LaTeX.
-   - **Trap:** one common mistake or misconception (optional — include only when there's a genuine, frequent pitfall).
+For subjects where problem-solving has clear method selection (most engineering / math / physics / stats):
 
-3. **Cross-chapter connections** — 2-3 bullets showing how this chapter's ideas link to previous or upcoming chapters (e.g. "Dot product → projections in Ch3 → work integrals in Ch6").
+Each tree is a card with a question header and nested branches.
 
-**NEVER write summaries as dense paragraph walls.** Each concept must be its own visible, scannable item. If a summary section looks like a single block of text listing terms with commas, it is wrong — break it into the cluster structure above.
+```html
+<div class="decision-tree">
+  <h3>Which Tool Do I Use?</h3>
+  <div class="tree">
+    <div class="branch">
+      <strong>Single variable, definite bounds?</strong>
+      → standard integral (Ch 5)
+    </div>
+    <div class="branch">
+      <strong>Vector field along a curve?</strong>
+      → line integral (Ch 6)
+      <div class="sub-branch">
+        <strong>Closed curve, F = ∇f?</strong> → FTCLI gives zero
+      </div>
+    </div>
+    <div class="branch">
+      <strong>Surface flux of F?</strong>
+      → surface integral (Ch 7) — consider Stokes' or Divergence
+    </div>
+  </div>
+</div>
+```
 
-## Quick Reference Table
+Typical trees per subject:
+- **Math (calc):** Which integral type? Which theorem (Green's / Stokes' / Divergence)? Which optimization method (unconstrained / constrained / bounded)?
+- **Dynamics:** Which coordinate system (rectangular / n-t / r-θ)? Energy or momentum?
+- **Stats:** Which hypothesis test? Which distribution?
+- **CS:** Which data structure? Which algorithm family?
 
-Sits at the bottom of the summary page, AFTER all chapter summaries. A compact `Test | Formula | Result` table of the most useful quick-check tests and shortcuts across all chapters. Expanded incrementally as each chapter is added (e.g. Ch1 adds perpendicularity/parallelism/coplanarity tests, Ch2 might add line-plane intersection tests, etc.). Keep it to the highest-value "is this true? → plug in formula → yes/no" items only.
+Add trees incrementally — by the final chapter you should have ~3 decision trees covering the major problem-type splits.
+
+## Per-Chapter Cards — Three-Part Structure
+
+Each chapter is added as it's completed. Pending chapters shown as muted placeholders. Each card has a colored left border in the chapter's title color.
+
+```html
+<div class="card-bracket" style="border-left:3.5px solid var(--ch1-title);">
+  <div class="eq-name" style="color:var(--ch1-title);">Ch 1 — Vectors</div>
+
+  <p><strong style="color:var(--ch1-title)">Key ideas:</strong></p>
+  <ul>
+    <li>→ Vectors have magnitude AND direction</li>
+    <li>→ Dot product measures alignment; cross product measures perpendicularity</li>
+    <li>→ Vector projection isolates one direction's contribution</li>
+  </ul>
+
+  <p><strong style="color:var(--ch1-title)">When to use what:</strong></p>
+  <ul>
+    <li>→ Need an angle? — dot product: \(\cos\theta = \frac{\vec u\cdot\vec v}{\|\vec u\|\|\vec v\|}\)</li>
+    <li>→ Need a perpendicular vector? — cross product: \(\vec u \times \vec v\)</li>
+    <li>→ Need parallel test? — cross product = 0</li>
+    <li>→ Need coplanarity? — scalar triple product = 0</li>
+  </ul>
+
+  <p><strong style="color:var(--ch1-title)">⚠ Traps:</strong></p>
+  <ol>
+    <li>Cross product is NOT commutative: \(\vec u\times\vec v = -\vec v\times\vec u\)</li>
+    <li>Dot product result is a scalar; cross product result is a vector</li>
+    <li>Don't forget magnitude in projection denominator</li>
+  </ol>
+</div>
+```
+
+**Three sections per chapter card:**
+- **Key ideas:** 3–4 conceptual anchors that capture the chapter's *worldview*. Not formulas — ideas. Use → as bullet markers.
+- **When to use what:** 6–8 decision rules in "Need X? — Method Y" format, each with the key formula inline. This is the most-used part of the card during prep.
+- **⚠ Traps:** 3–4 common mistakes / misconceptions. Numbered list with warning icon.
+
+**No dense paragraphs.** Each item must be its own scannable line.
+
+## Quick Reference Table — Sortable By Problem Type
+
+Sits at the bottom, AFTER chapter cards. Compact table organized by **problem type**, with color-coded left borders showing which chapter each row belongs to. This is the "I can't remember which formula" rescue table.
+
+```html
+<table class="quick-ref">
+  <thead><tr><th>Problem Type</th><th>Formula / Method</th><th>Key Detail</th></tr></thead>
+  <tbody>
+    <tr style="border-left:3px solid var(--ch1-title)">
+      <td>Perpendicular?</td>
+      <td>\(\vec u\cdot\vec v = 0\)</td>
+      <td>⊥ test</td>
+    </tr>
+    <tr style="border-left:3px solid var(--ch1-title)">
+      <td>Parallel?</td>
+      <td>\(\vec u\times\vec v = 0\)</td>
+      <td>∥ test</td>
+    </tr>
+    <tr style="border-left:3px solid var(--ch2-title)">
+      <td>Line through two points</td>
+      <td>\(\vec r = \vec r_0 + t(\vec r_1 - \vec r_0)\)</td>
+      <td>parametric form</td>
+    </tr>
+  </tbody>
+</table>
+```
+
+Grouped by problem type (NOT by chapter) so a student facing an unfamiliar problem can scan by what they're being asked, not where it came from. The chapter color border preserves the chapter origin without ordering by it.
+
+Keep it to the highest-value "is this true? → plug in formula → yes/no" or "I need X → use Y" items only. Aim for ~15-25 rows by the end of the course.
 
 ## Styling
 
-Use the course theme's accent colors to visually distinguish cluster headings. The What/Why/How/Trap labels on each line MUST each be a different color to stand out — use `<dt class="wh-what">`, `<dt class="wh-why">`, `<dt class="wh-how">`, `<dt class="wh-trap">` with corresponding CSS using a deep-to-bright gradient palette (e.g. What = #142850 dark navy, Why = #27496D steel blue, How = #0C7B93 teal, Trap = #00A8CC bright cyan — adapt to the theme's palette). 
-
-All equations (KaTeX) inside summary clusters MUST be highlighted with a red highlighter effect:
+Use the course theme's accent slots to visually distinguish the What/Why/How/Trap labels — each MUST be a different color to stand out. Use `<dt class="wh-what">`, `<dt class="wh-why">`, `<dt class="wh-how">`, `<dt class="wh-trap">` mapped to four of the theme's content-type accents:
 
 ```css
-.cluster .katex{color:var(--eq)!important;background:rgba(139,26,26,.1);padding:1px 4px;border-radius:3px;}
+.wh-what { color: var(--def); }   /* definition accent */
+.wh-why  { color: var(--der); }   /* derivation accent */
+.wh-how  { color: var(--eq);  }   /* equation accent */
+.wh-trap { color: var(--tip); }   /* tip accent */
 ```
+
+The exact hex values come from the active theme. Never hardcode hex codes in the spec — themes are customizable.
 
 Every formula from the formula sheet must appear in at least one cluster's How line — cross-check before finalizing. Keep each What/Why/How line short enough to read without horizontal scrolling.
 
-## Equations in Summary — Red Highlighter Effect
+## Equations in Summary — Highlighter Effect
 
-Not just colored text, but a visible background highlight like a marker on paper:
+Equations inside summary clusters get a subtle background highlight (like a marker on paper) so they pop without needing extra color:
 
 ```css
-.cluster .katex{color:var(--eq)!important;background:rgba(139,26,26,.1);padding:1px 4px;border-radius:3px;}
+.cluster .katex {
+  color: var(--eq) !important;
+  background: var(--eq-highlight);    /* theme provides a translucent tint of --eq */
+  padding: 1px 4px;
+  border-radius: 3px;
+}
 ```
+
+Each theme defines `--eq-highlight` as a low-opacity version of its equation accent (typically the same hue at 8–12% alpha). The hue follows the theme; the spec only mandates that there IS a highlight.

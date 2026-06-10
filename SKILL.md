@@ -1,14 +1,15 @@
 ---
 name: course-notes
 description: >
-  Interactive course notes with 30 selectable themes. Supports engineering, math, stats, CS, business, physics,
-  and any university course. Trigger on: class notes, lecture notes, chapter notes, equation sheets, formula sheets,
-  theorem references, algorithm references, assignment solutions (PA, homework, labs), test/midterm/final exam prep,
-  course progress tracking, study notes, practice problems, chapter examples, worked examples, proofs, derivations,
-  code walkthroughs, case studies, quiz prep, diagrams, or uploading images of notes, textbook pages, lecture slides,
-  or handwritten work. Also trigger when updating or viewing previously created notes, fixing bugs in existing notes,
-  or changing themes/styles. Always use this skill for academic note-taking even if the user doesn't name a specific
-  subject — if they mention a course, class, or studying, this skill applies.
+  Manage the user's HTML-based course notes system. Use for: fixing bugs in their notes site
+  (sidebar, mobile, shell-head.html, themes), changing visual themes or fonts, converting lecture
+  slides or handwritten PDFs into formatted chapter notes, creating condensed cheatsheets from
+  existing notes before exams, writing step-by-step PA/homework solutions, or adding new chapters
+  from course material. Trigger when the user says "my notes," "my notes site," mentions theme
+  changes, references HTML/styling issues in their notes, wants to reformat borrowed or handwritten
+  notes to match their setup, or is building course content from slides, textbook pages, or
+  assignment sheets. Skip for: general homework help / concept Q&A, study schedules, course
+  selection, meeting notes, transcription, or one-off math problems.
 ---
 
 # Course Notes System
@@ -52,6 +53,8 @@ Examples: "fix the sidebar toggle," "the formula popup is clipping," "change the
 
 **Workflow:** Fetch the named file(s) from the repo → fix the issue → rebuild with `build.py` → push changed files. No `progress.md` needed. No session log update needed for cosmetic fixes.
 
+**Scope of the fix — apply spec-aligned siblings, document them.** When the user names ONE thing to fix, also correct any *immediately adjacent* spec violations in the same block (wrong opacity, missing required `box-shadow`, off-spec color tokens, etc.) — the relevant reference file (`component-styles.md`, `themes.md`) is already in context, and a stand-alone fix that leaves the rest broken is half a fix. **Always list every adjacent fix you applied in `RUN_NOTES.md` (or the session response)** with one line each: *"Also fixed X because spec says Y."* This lets the user revert anything they were doing on purpose. Do not range further than the block being fixed — never open or modify other selectors/files looking for things to clean up.
+
 ### Tier 2 — Scoped Addition (fetch relevant fragments directly)
 
 Adding content that doesn't need cross-chapter referencing. The user provides the material or context.
@@ -73,6 +76,19 @@ Examples: "here's Chapter 6, write the notes," "add lecture 12 notes from these 
 The user is starting a brand new course.
 
 **Workflow:** Run the setup questions → create the repo structure → push initial files. See "Course Setup" below.
+
+### Combined Tier 3 + Tier 4 — New course AND first chapter content in the same request
+
+This is common ("starting MAAE 2300, here's lecture 1, write it up"). The temptation is to do all the scaffolding first and treat the chapter as the last step — but **that order has been shown to exhaust context budget on placeholders before any real content is written**. Use this order instead:
+
+1. **Read the source material first** (lecture PDF, slides). For PDFs, extract images selectively NOW with `pdftoppm` — do not wait until you're inside the chapter HTML; you need the image files on disk before you start writing.
+2. **Course config + minimal scaffold.** Create `progress.md` (config header + fetch guide + empty concepts index + session-log entry placeholder), `shell-head.html`, `shell-foot.html`, `build.py`, `project-rules.md`.
+3. **Write Chapter 1 content fully** — `ch1-notes.html` with embedded images, `formulas.html`, `summary.html`, `progress.html`. This is non-negotiable. If you started this turn, the chapter content must land.
+4. **Then minimal placeholder fragments** for future chapters/labs/exams (see Skeleton-First Build Order — placeholders are 1–2 line stubs only, NOT structured templates).
+5. **Update `progress.md`** concepts index + session log with what you actually wrote.
+6. **Push.**
+
+The student gets a working Chapter 1 even if you run out of budget before all placeholders are written. Placeholders can be filled lazily in future sessions; Chapter 1 content cannot.
 
 ---
 
@@ -225,6 +241,8 @@ python3 scripts/push_to_github.py <filepath> <repo> <repo_path> "$TOKEN" "Add Ch
 ```
 Only push files that changed — typically 5-7, never all files.
 
+**Diagrams — add SVGs automatically where they help.** Within `chN-notes.html` and `chN-prob.html`, auto-add SVG diagrams for any content that has a visual setup: problems with geometry/forces/flow, conceptual diagrams (state diagrams, classification trees, free-body sketches), graphs the lecture references (e.g. density vs δV plots). Don't wait for the user to ask. The skill should always favor adding a diagram when one would help comprehension — this is the highest-leverage thing the skill provides over flat text. See `references/diagram-rules.md`.
+
 **Step 6 — Update `progress.md`.**
 Add the new chapter to the concepts index and append to the session log. Push `progress.md`.
 
@@ -244,9 +262,11 @@ When the user uploads the course textbook PDF and asks to write a chapter:
 
 ### Image Extraction Pipeline
 
+**Run this BEFORE writing any chapter HTML.** Image extraction is a separate, prior phase — not something to defer until you're inside the notes file. Having all image files on disk before you start writing prevents the "I'll inject the base64 strings programmatically later" trap where the chapter HTML never gets finished.
+
 **Step 1: Scan the entire upload.** Read/view every page (or scoped chapter pages for textbooks). Build an inventory of diagrams, figures, examples, derivation steps, tables, code samples.
 
-**Step 2: Extract important images selectively.** For PDFs: `pdftoppm -f {page} -l {page} -png input.pdf output`. Only extract pages with visual content — not every page.
+**Step 2: Extract important images selectively.** For PDFs: `pdftoppm -f {page} -l {page} -png input.pdf output`. Only extract pages with visual content — not every page. Save extracted images to a known directory (e.g. `images/` next to the chapter file) and write a manifest (`images/manifest.json`) mapping page → filename → caption so the chapter writer doesn't have to re-figure-out what each image is.
 
 **Step 3: Decide what to embed.**
 
@@ -269,14 +289,17 @@ When the user uploads the course textbook PDF and asks to write a chapter:
 
 When generating a course notes file system for the first time:
 
-1. **Create the full skeleton FIRST** — `shell-head.html` with CSS and sidebar, `shell-foot.html` with JS, placeholder fragments for every chapter/section
-2. **Populate the sidebar immediately** with all menu items from the config — pending items styled with lighter color but still clickable
-3. **Create `build.py`** that assembles all fragments
-4. **Create `progress.md`** with fetch guide, empty concepts index, initial session log
-5. **Create `project-rules.md`** with project rules
-6. **Formula sheet, Summary, and Progress are live from the start** — they begin with whatever content exists and grow incrementally. NEVER "generated after all chapters"
-7. **When a new chapter is added**, also update: `formulas.html`, `summary.html`, `progress.html`
-8. **Push all files to GitHub** via the push script
+1. **Build the live shell** — `shell-head.html` with CSS and sidebar, `shell-foot.html` with JS.
+2. **Populate the sidebar immediately** with all menu items from the config — pending items styled with lighter color but still clickable.
+3. **Create `build.py`** that assembles all fragments.
+4. **Create `progress.md`** with fetch guide, empty concepts index, initial session log.
+5. **Create `project-rules.md`** with project rules.
+6. **Create placeholder fragments — as 1-line stubs only.** For every future chapter/section in the sidebar (ch2-notes, ch2-prob, ch3-notes, ch3-prob, lab1, lab2, m1prep, m2prep, final, etc.), the placeholder is literally a one-line HTML comment plus an empty `<section>` wrapper. Example: `<!-- pending --><section id="ch2"></section>`. **Do NOT** write structured templates, "coming soon" boilerplate, or stub headings — that's hundreds of bytes per file × dozens of files = thousands of tokens that buy nothing. `build.py` only needs the section wrappers to exist. The chapter's own session will populate it when the time comes.
+7. **Formula sheet, Summary, and Progress are live from the start** — they begin with whatever content exists and grow incrementally. NEVER "generated after all chapters."
+8. **When a new chapter is added**, also update: `formulas.html`, `summary.html`, `progress.html`.
+9. **Push all files to GitHub** via the push script.
+
+If first-chapter content was requested in the same turn as setup, see "Combined Tier 3 + Tier 4" above — Chapter 1 content lands BEFORE placeholders 6.
 
 ### Repo Structure
 

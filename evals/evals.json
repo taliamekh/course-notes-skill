@@ -1,0 +1,34 @@
+{
+  "skill_name": "course-notes",
+  "course_context": "MAAE 2300-A Fluid Mechanics I, Summer 2026, Carleton University. Instructor Dr. Nafisa Bano. Textbook: Fluid Mechanics 9e by Frank White & Henry Xue (McGraw Hill, 2021). Assessments: 3 labs (Venturi Meter, Jet Pump, Flow Measurement), Midterm I (May 21 — fluid statics, Ch 1-2), Midterm II (June 11 — Bernoulli & RTT, Ch 2-3), Final (cumulative).",
+  "evals": [
+    {
+      "id": 1,
+      "name": "tier1-sidebar-color-fix",
+      "prompt": "the active sidebar item on my MAAE2300A fluid mechanics notes is basically invisible — it's set to dark purple (#2C1B5E) and blends right into the dark Deep Space background. it should pop using the teal accent (#56D6C1) instead. here's the relevant block from my shell-head.html:\n\n```css\n.sidebar a.active {\n  background: rgba(110, 80, 200, 0.15);\n  color: #2C1B5E;\n  border-left: 3px solid #2C1B5E;\n}\n```\n\nfix it and push. repo is taliamekh/maae-2300-fluids, token is in $GITHUB_TOKEN.",
+      "expected_output": "Tier 1 routing: does NOT fetch progress.md. May consult references/component-styles.md for sidebar conventions. Produces a CSS patch that changes color and border-left to the teal accent #56D6C1 (and likely lightens/adjusts the background). Attempts to push only the changed file via scripts/push_to_github.py. No regression on other files.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "name": "tier1-font-change-themes-ref",
+      "prompt": "i'm not loving Space Grotesk for my engineering notes — switch the font to JetBrains Mono instead, it'll match the technical vibe better. update the font import and the body font-family in my shell-head.html and push. repo is taliamekh/maae-2300-fluids, token in $GITHUB_TOKEN.",
+      "expected_output": "Tier 1 routing: agent loads references/themes.md to confirm JetBrains Mono is a valid font option (it's listed) and to grab the correct Google Fonts @import URL. Updates only shell-head.html. Does NOT fetch progress.md. Pushes one file.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "name": "tier2-solve-problems",
+      "prompt": "add solutions for 3 textbook problems to my Chapter 1 problems page (ch1-prob.html) for my MAAE 2300 fluid mechanics class. textbook is White & Xue 9e. problems:\n\nP1.1: A swimming pool measuring 6 m long by 3 m wide is filled to a depth of 1.2 m with water (ρ = 998 kg/m³). Find (a) the total mass of water in the pool, (b) the total weight of water on the pool floor. Use g = 9.81 m/s².\n\nP1.2: The dynamic viscosity μ of glycerin is 1.5 N·s/m² at 20°C, and its specific gravity is 1.26. Calculate (a) the kinematic viscosity ν in m²/s, (b) the kinematic viscosity in stokes (cm²/s). Reference density of water is 1000 kg/m³.\n\nP1.3: A clean glass tube of inner diameter 0.8 mm is inserted vertically into a beaker of water (σ = 0.0728 N/m, ρ = 998 kg/m³). Assuming contact angle θ = 0°, calculate the capillary rise h. Use g = 9.81 m/s².\n\npush ch1-prob.html only. repo is taliamekh/maae-2300-fluids, token in $GITHUB_TOKEN.",
+      "expected_output": "Tier 2 routing: fetches only ch1-prob.html (no progress.md, since the chapter is named). Loads references/solution-pipeline.md for the 7-step solution format and references/formula-sheet-spec.md / component-styles.md for the card/pill formatting. Each solution shows: read/sketch → strategy → setup → step-by-step algebra → boxed answer → check → exam tip. No skipped steps. Pushes only ch1-prob.html.",
+      "files": []
+    },
+    {
+      "id": 4,
+      "name": "tier3-chapter-from-real-lecture",
+      "prompt": "writing the first chapter notes for my MAAE 2300-A Fluid Mechanics I class. this is the intro lecture from Dr. Bano. textbook is Fluid Mechanics 9e by Frank White & Henry Xue (McGraw Hill, 2021).\n\nthe lecture slides PDF is at: C:\\Users\\Talia\\Downloads\\MAAE 2300 - Summer2026 - Introduction.pdf\n\nplease read every page of the PDF, then write the chapter — read the lecture material thoroughly so every concept from the slides ends up in the notes (Significance/Applications, Concept of a Fluid, Classification of Matter solid/liquid/gas/plasma, Continuum hypothesis with the δV* limit, Branches of Fluid Mechanics). include the application images where the slides have them.\n\ncourse setup info (since this is the first ever chapter and the repo is brand new):\n- Course: MAAE 2300-A — Fluid Mechanics I\n- Subject: Engineering\n- Content org: Chapters\n- Theme: Deep Space (default)\n- Assessments: 3 labs (Venturi Meter, Jet Pump, Flow Measurement), Midterm I (May 21, covers ch 1-2 statics), Midterm II (June 11, Bernoulli + RTT), Final (cumulative)\n\nrepo is taliamekh/maae-2300-fluids (empty, needs initial scaffold). token in $GITHUB_TOKEN. push everything that gets created — initial repo scaffold (shell-head, shell-foot, build.py, progress.md, project-rules.md, empty fragments) AND the chapter 1 content (ch1-notes.html, formulas.html with ρ/μ definitions, summary.html with ch1 cluster, progress.html with ch1 items).",
+      "expected_output": "Combined Tier 4 + Tier 3 flow. Agent reads the PDF page-by-page (or scoped) and extracts every concept. Sets up new repo scaffold per skeleton-first build order. Creates progress.md with course config header, fetch guide, concepts index seeded with Ch1, session log. Loads multiple reference files: themes.md (Deep Space colors), component-styles.md (cards/sidebar), solution-pipeline.md, formula-sheet-spec.md, summary-spec.md, diagram-rules.md (if branching tree diagram needed). Chapter notes include all 4 major concept areas, with embedded application images where slides had them. Formula sheet seeded with density and viscosity definitions. Sidebar reflects assessments (3 labs, 2 midterms, 1 final).",
+      "files": ["C:\\Users\\Talia\\Downloads\\MAAE 2300 - Summer2026 - Introduction.pdf"]
+    }
+  ]
+}
